@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>陸上クラブ 記録管理アプリ</title>
+<style>
+body { font-family: sans-serif; padding: 10px; }
+h2 { background: #e3f2fd; padding: 6px; }
+input, select, button { width: 100%; margin: 4px 0; }
+table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
+.admin { background: #fce4ec; padding: 8px; }
+.parent { background: #e8f5e9; padding: 8px; }
+</style>
+</head>
+<body>
+
+<h1>🏃‍♂️ 陸上クラブ 記録管理</h1>
+
+<!-- 指導者用 -->
+<div class="admin">
+<h2>🧑‍🏫 指導者用（管理）</h2>
+
+<h3>📅 練習記録</h3>
+<input type="date" id="pDate">
+<input type="text" id="pName" placeholder="名前">
+<input type="number" id="laps" placeholder="周数">
+<input type="text" id="pTime" placeholder="タイム（例 15:30）">
+<button onclick="addPractice()">保存</button>
+
+<h3>🏆 大会記録</h3>
+<input type="date" id="rDate">
+<input type="text" id="rName" placeholder="名前">
+<input type="text" id="raceTitle" placeholder="大会名">
+<input type="number" id="distance" placeholder="距離（m）">
+<input type="text" id="time" placeholder="タイム（例 5:32）">
+<input type="number" id="rank" placeholder="順位">
+<button onclick="addRace()">保存</button>
+
+<button onclick="exportCSV()">📤 CSV出力</button>
+</div>
+
+<hr>
+
+<!-- 保護者用 -->
+<div class="parent">
+<h2>👨‍👩‍👧 保護者用（閲覧）</h2>
+
+<select id="childSelect"></select>
+<input type="password" id="pass" placeholder="共有パスコード">
+<button onclick="login()">表示</button>
+
+<h3>📅 練習記録</h3>
+<table id="practiceView">
+<tr><th>日付</th><th>周数</th><th>距離(m)</th><th>タイム</th></tr>
+</table>
+
+<h3>🏆 大会記録</h3>
+<table id="raceView">
+<tr><th>日付</th><th>大会</th><th>距離</th><th>タイム</th><th>順位</th><th>PB</th></tr>
+</table>
+</div>
+
+<script>
+const LAP_DISTANCE = 270;
+
+let children = JSON.parse(localStorage.getItem("children")) || {};
+let practices = JSON.parse(localStorage.getItem("practices")) || [];
+let races = JSON.parse(localStorage.getItem("races")) || [];
+
+function addPractice(){
+  if(!children[pName.value]){
+    children[pName.value] = prompt("この子の共有パスコードを設定してください");
+    localStorage.setItem("children", JSON.stringify(children));
+  }
+  practices.push({
+    date:pDate.value,
+    name:pName.value,
+    laps:laps.value,
+    time:pTime.value
+  });
+  localStorage.setItem("practices",JSON.stringify(practices));
+  updateSelect();
+}
+
+function addRace(){
+  races.push({
+    date:rDate.value,
+    name:rName.value,
+    title:raceTitle.value,
+    distance:distance.value,
+    time:time.value,
+    rank:rank.value
+  });
+  localStorage.setItem("races",JSON.stringify(races));
+}
+
+function updateSelect(){
+  childSelect.innerHTML = "";
+  Object.keys(children).forEach(n=>{
+    childSelect.innerHTML += `<option value="${n}">${n}</option>`;
+  });
+}
+
+function login(){
+  const name = childSelect.value;
+  if(children[name] !== pass.value){
+    alert("パスコードが違います");
+    return;
+  }
+  showData(name);
+}
+
+function showData(name){
+  practiceView.innerHTML =
+    "<tr><th>日付</th><th>周数</th><th>距離</th><th>タイム</th></tr>";
+  practices.filter(p=>p.name===name).forEach(p=>{
+    practiceView.innerHTML +=
+      `<tr>
+        <td>${p.date}</td>
+        <td>${p.laps}</td>
+        <td>${p.laps * LAP_DISTANCE}</td>
+        <td>${p.time}</td>
+      </tr>`;
+  });
+
+  raceView.innerHTML =
+    "<tr><th>日付</th><th>大会</th><th>距離</th><th>タイム</th><th>順位</th><th>PB</th></tr>";
+
+  const best = {};
+  races.filter(r=>r.name===name).forEach(r=>{
+    const pb = !best[r.distance] || r.time < best[r.distance];
+    if(pb) best[r.distance] = r.time;
+    raceView.innerHTML +=
+      `<tr>
+        <td>${r.date}</td>
+        <td>${r.title}</td>
+        <td>${r.distance}</td>
+        <td>${r.time}</td>
+        <td>${r.rank}位</td>
+        <td>${pb ? "⭐" : ""}</td>
+      </tr>`;
+  });
+}
+
+function exportCSV(){
+  let csv = "区分,日付,名前,内容\n";
+  practices.forEach(p=>{
+    csv += `練習,${p.date},${p.name},${p.laps}周 ${p.time}\n`;
+  });
+  races.forEach(r=>{
+    csv += `大会,${r.date},${r.name},${r.title} ${r.distance}m ${r.time} ${r.rank}位\n`;
+  });
+  const blob = new Blob([csv],{type:"text/csv"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "club_record.csv";
+  a.click();
+}
+
+updateSelect();
+</script>
+
+</body>
+</html>
